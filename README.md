@@ -1,4 +1,4 @@
-# Age Checker
+# Age Detector
 
 A tool to detect if people in images are underage (under 18). Supports CLI and HTTP API for n8n integration.
 
@@ -15,8 +15,8 @@ A tool to detect if people in images are underage (under 18). Supports CLI and H
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/age-checker.git
-cd age-checker
+git clone https://github.com/YOUR_USERNAME/age-detector.git
+cd age-detector
 
 # Install dependencies
 pip install -r requirements.txt
@@ -34,20 +34,20 @@ python download_models.py
 
 ```bash
 # Check a single image
-python3 -m age_checker check image.jpg
+python3 -m age_detector check image.jpg
 
 # Batch process a directory
-python3 -m age_checker check ./images/ --output results.json
+python3 -m age_detector check ./images/ --output results.json
 
 # With visualization
-python3 -m age_checker check image.jpg --visualize --output results.json
+python3 -m age_detector check image.jpg --visualize --output results.json
 ```
 
 ### HTTP API
 
 ```bash
 # Start the API server
-python3 -m age_checker.api --port 5000
+python3 -m age_detector.api --port 5000
 ```
 
 #### API Endpoints
@@ -111,7 +111,7 @@ python3 -m age_checker.api --port 5000
 ### Example n8n Workflow
 
 ```
-[Webhook] → [HTTP Request: Age Check] → [IF: Underage?] → [Actions]
+[Webhook] → [HTTP Request: Age Detection] → [IF: Underage?] → [Actions]
 ```
 
 ## Deployment
@@ -120,10 +120,10 @@ python3 -m age_checker.api --port 5000
 
 ```bash
 # Build the image
-docker build -t age-checker .
+docker build -t age-detector .
 
 # Run the container
-docker run -p 5000:5000 age-checker
+docker run -p 5000:5000 age-detector
 ```
 
 ### Docker Compose
@@ -158,7 +158,7 @@ railway up
 1. Create a new Web Service
 2. Connect your GitHub repository
 3. Set build command: `pip install -r requirements.txt && python download_models.py`
-4. Set start command: `python -m age_checker.api --host 0.0.0.0 --port $PORT`
+4. Set start command: `python -m age_detector.api --host 0.0.0.0 --port $PORT`
 
 #### Fly.io
 
@@ -188,8 +188,8 @@ A person is considered **underage** if the midpoint of the predicted interval is
 ## Project Structure
 
 ```
-age-checker/
-├── age_checker/
+age-detector/
+├── age_detector/
 │   ├── __init__.py
 │   ├── __main__.py
 │   ├── detector.py       # Face detection module

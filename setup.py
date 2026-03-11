@@ -1,4 +1,4 @@
-"""Setup script for age-checker package."""
+"""Setup script for age-detector package."""
 
 from setuptools import setup, find_packages
 
@@ -9,14 +9,14 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
 setup(
-    name="age-checker",
+    name="age-detector",
     version="0.1.0",
     author="Your Name",
     author_email="your.email@example.com",
     description="A tool to detect if people in images are underage (under 18)",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/age-checker",
+    url="https://github.com/yourusername/age-detector",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -33,8 +33,8 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "age-checker=age_checker.cli:main",
-            "age-checker-api=age_checker.api:main",
+            "age-detector=age_detector.cli:main",
+            "age-detector-api=age_detector.api:main",
         ],
     },
     include_package_data=True,

@@ -17,7 +17,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY age_checker/ ./age_checker/
+COPY age_detector/ ./age_detector/
 COPY download_models.py .
 COPY models/ ./models/
 
@@ -28,4 +28,4 @@ RUN python download_models.py || true
 EXPOSE 5000
 
 # Run the API server
-CMD ["python", "-m", "age_checker.api", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["python", "-m", "age_detector.api", "--host", "0.0.0.0", "--port", "5000"]

@@ -1,4 +1,4 @@
-"""Command-line interface for age checker."""
+"""Command-line interface for age detector."""
 
 import argparse
 import json
