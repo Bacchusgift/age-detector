@@ -1,0 +1,15 @@
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.git
+.gitignore
+.venv
+venv
+*.md
+test_images
+*.jpg
+*.png
+*.json
+.DS_Store
+.claude

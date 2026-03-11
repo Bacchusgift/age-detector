@@ -2,8 +2,7 @@
 
 import base64
 import io
-import tempfile
-import os
+import urllib.request
 
 import cv2
 import numpy as np
@@ -34,6 +33,79 @@ def get_estimator():
     return estimator
 
 
+def process_image(image: np.ndarray) -> dict:
+    """Process an image and return detection results."""
+    faces = get_detector().detect_faces_from_array(image)
+
+    results = []
+    underage_count = 0
+
+    for i, (x1, y1, x2, y2) in enumerate(faces):
+        face = image[y1:y2, x1:x2]
+
+        if face.size == 0:
+            continue
+
+        try:
+            age_interval, is_under_18, confidence = get_estimator().estimate_age(face)
+            age_midpoint = get_estimator().get_age_midpoint(age_interval)
+
+            result = {
+                "face_id": i + 1,
+                "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                "age_interval": age_interval,
+                "estimated_age": float(age_midpoint),
+                "is_under_18": bool(is_under_18),
+                "confidence": round(float(confidence), 4)
+            }
+
+            if is_under_18:
+                underage_count += 1
+
+            results.append(result)
+        except Exception as e:
+            results.append({
+                "face_id": i + 1,
+                "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                "error": str(e)
+            })
+
+    return {
+        "success": True,
+        "faces_detected": len(faces),
+        "underage_count": underage_count,
+        "results": results
+    }
+
+
+def load_image_from_base64(image_data: str) -> np.ndarray:
+    """Load image from base64 encoded data."""
+    # Handle data URL format (data:image/jpeg;base64,...)
+    if image_data.startswith('data:'):
+        image_data = image_data.split(',', 1)[1]
+
+    image_bytes = base64.b64decode(image_data)
+    pil_image = Image.open(io.BytesIO(image_bytes))
+    pil_image = pil_image.convert('RGB')
+    image = np.array(pil_image)
+    return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+
+def load_image_from_url(url: str, timeout: int = 30) -> np.ndarray:
+    """Load image from URL."""
+    req = urllib.request.Request(
+        url,
+        headers={'User-Agent': 'Mozilla/5.0 (compatible; AgeChecker/1.0)'}
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        image_bytes = response.read()
+
+    pil_image = Image.open(io.BytesIO(image_bytes))
+    pil_image = pil_image.convert('RGB')
+    image = np.array(pil_image)
+    return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint."""
@@ -45,79 +117,47 @@ def check_image():
     """
     Check an image for underage people.
 
-    Expects JSON body with:
+    Expects JSON body with ONE of:
     - image: base64 encoded image data
-    - or url: URL to fetch image from (optional, not implemented)
+    - url: URL to fetch image from
 
     Returns JSON with detection results.
     """
     try:
         data = request.get_json()
 
-        if not data or 'image' not in data:
+        if not data:
             return jsonify({
-                "error": "Missing 'image' field with base64 encoded image"
+                "success": False,
+                "error": "Missing JSON body"
             }), 400
 
-        # Decode base64 image
-        image_data = data['image']
-
-        # Handle data URL format (data:image/jpeg;base64,...)
-        if image_data.startswith('data:'):
-            image_data = image_data.split(',', 1)[1]
-
-        image_bytes = base64.b64decode(image_data)
-
-        # Convert to numpy array
-        pil_image = Image.open(io.BytesIO(image_bytes))
-        pil_image = pil_image.convert('RGB')
-        image = np.array(pil_image)
-        # Convert RGB to BGR (OpenCV format)
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
-        # Detect faces
-        faces = get_detector().detect_faces_from_array(image)
-
-        results = []
-        underage_count = 0
-
-        for i, (x1, y1, x2, y2) in enumerate(faces):
-            # Extract face region
-            face = image[y1:y2, x1:x2]
-
-            if face.size == 0:
-                continue
-
+        if 'url' in data:
+            # Load from URL
             try:
-                age_interval, is_under_18, confidence = get_estimator().estimate_age(face)
-                age_midpoint = get_estimator().get_age_midpoint(age_interval)
-
-                result = {
-                    "face_id": i + 1,
-                    "bbox": [int(x1), int(y1), int(x2), int(y2)],
-                    "age_interval": age_interval,
-                    "estimated_age": float(age_midpoint),
-                    "is_under_18": bool(is_under_18),
-                    "confidence": round(float(confidence), 4)
-                }
-
-                if is_under_18:
-                    underage_count += 1
-
-                results.append(result)
+                image = load_image_from_url(data['url'])
             except Exception as e:
-                results.append({
-                    "face_id": i + 1,
-                    "bbox": [int(x1), int(y1), int(x2), int(y2)],
-                    "error": str(e)
-                })
+                return jsonify({
+                    "success": False,
+                    "error": f"Failed to load image from URL: {str(e)}"
+                }), 400
+        elif 'image' in data:
+            # Load from base64
+            try:
+                image = load_image_from_base64(data['image'])
+            except Exception as e:
+                return jsonify({
+                    "success": False,
+                    "error": f"Failed to decode base64 image: {str(e)}"
+                }), 400
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Missing 'image' (base64) or 'url' field"
+            }), 400
 
-        return jsonify({
-            "success": True,
-            "faces_detected": len(faces),
-            "underage_count": underage_count,
-            "results": results
-        })
+        result = process_image(image)
+        return jsonify(result)
 
     except Exception as e:
         return jsonify({
@@ -137,6 +177,7 @@ def check_file():
     try:
         if 'file' not in request.files:
             return jsonify({
+                "success": False,
                 "error": "No file uploaded"
             }), 400
 
@@ -149,52 +190,13 @@ def check_file():
 
         if image is None:
             return jsonify({
+                "success": False,
                 "error": "Could not read image file"
             }), 400
 
-        # Detect faces
-        faces = get_detector().detect_faces_from_array(image)
-
-        results = []
-        underage_count = 0
-
-        for i, (x1, y1, x2, y2) in enumerate(faces):
-            face = image[y1:y2, x1:x2]
-
-            if face.size == 0:
-                continue
-
-            try:
-                age_interval, is_under_18, confidence = get_estimator().estimate_age(face)
-                age_midpoint = get_estimator().get_age_midpoint(age_interval)
-
-                result = {
-                    "face_id": i + 1,
-                    "bbox": [int(x1), int(y1), int(x2), int(y2)],
-                    "age_interval": age_interval,
-                    "estimated_age": float(age_midpoint),
-                    "is_under_18": bool(is_under_18),
-                    "confidence": round(float(confidence), 4)
-                }
-
-                if is_under_18:
-                    underage_count += 1
-
-                results.append(result)
-            except Exception as e:
-                results.append({
-                    "face_id": i + 1,
-                    "bbox": [int(x1), int(y1), int(x2), int(y2)],
-                    "error": str(e)
-                })
-
-        return jsonify({
-            "success": True,
-            "filename": file.filename,
-            "faces_detected": len(faces),
-            "underage_count": underage_count,
-            "results": results
-        })
+        result = process_image(image)
+        result['filename'] = file.filename
+        return jsonify(result)
 
     except Exception as e:
         return jsonify({
@@ -216,9 +218,9 @@ def main():
 
     print(f"Starting Age Checker API server on {args.host}:{args.port}")
     print(f"Endpoints:")
-    print(f"  GET  /health - Health check")
-    print(f"  POST /check  - Check image (JSON body with base64 image)")
-    print(f"  POST /check/file - Check uploaded file (multipart form)")
+    print(f"  GET  /health      - Health check")
+    print(f"  POST /check       - Check image (JSON with 'image' base64 or 'url')")
+    print(f"  POST /check/file  - Check uploaded file (multipart form)")
 
     app.run(host=args.host, port=args.port, debug=args.debug)
 
