@@ -166,6 +166,60 @@ def check_image():
         }), 500
 
 
+@app.route('/check/underage', methods=['POST'])
+def check_underage():
+    """
+    Simple endpoint to check if image contains underage people.
+
+    Expects JSON body with ONE of:
+    - image: base64 encoded image data
+    - url: URL to fetch image from
+
+    Returns a simple response with has_underage boolean.
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "Missing JSON body"
+            }), 400
+
+        if 'url' in data:
+            try:
+                image = load_image_from_url(data['url'])
+            except Exception as e:
+                return jsonify({
+                    "success": False,
+                    "error": f"Failed to load image from URL: {str(e)}"
+                }), 400
+        elif 'image' in data:
+            try:
+                image = load_image_from_base64(data['image'])
+            except Exception as e:
+                return jsonify({
+                    "success": False,
+                    "error": f"Failed to decode base64 image: {str(e)}"
+                }), 400
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Missing 'image' (base64) or 'url' field"
+            }), 400
+
+        result = process_image(image)
+        return jsonify({
+            "has_underage": result["underage_count"] > 0
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
 @app.route('/check/file', methods=['POST'])
 def check_file():
     """
@@ -218,9 +272,10 @@ def main():
 
     print(f"Starting Age Checker API server on {args.host}:{args.port}")
     print(f"Endpoints:")
-    print(f"  GET  /health      - Health check")
-    print(f"  POST /check       - Check image (JSON with 'image' base64 or 'url')")
-    print(f"  POST /check/file  - Check uploaded file (multipart form)")
+    print(f"  GET  /health          - Health check")
+    print(f"  POST /check           - Check image (JSON with 'image' base64 or 'url')")
+    print(f"  POST /check/underage  - Simple check, returns has_underage boolean")
+    print(f"  POST /check/file      - Check uploaded file (multipart form)")
 
     app.run(host=args.host, port=args.port, debug=args.debug)
 
